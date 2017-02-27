@@ -225,9 +225,9 @@ class SequentialVAE(Network):
 
             if use_gui is True:
                 if self.data_dims[-1] == 1:
-                    self.mc_fig.add_subplot(1, 1+len(label_set), i+1).imshow(v[:, :, 0], cmap='gray')
+                    self.mc_fig.add_subplot(1, 2, i+1).imshow(v[:, :, 0], cmap='gray')
                 else:
-                    self.mc_fig.add_subplot(1, 1+len(label_set), i+1).imshow(v)
+                    self.mc_fig.add_subplot(1, 2, i+1).imshow(v)
                 self.mc_fig.gca().xaxis.set_visible(False)
                 self.mc_fig.gca().yaxis.set_visible(False)
                 if i == 1:
