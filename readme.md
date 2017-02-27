@@ -28,13 +28,13 @@ You can see the visualizations in the folder ```$pwd/models/[network_name]/sampl
 
 # LSUN
 
-For LSUN bedroom we provide a preprocessed version available for download here. The images have been center cropped, resized, and organized into batches with 10000 images each for efficient I/O. 
+For LSUN bedroom we provide a preprocessed version available for download [here (Google Drive)](https://drive.google.com/file/d/0B9xKPbqoJATCajd0QWtJWVlIY3c/view?usp=sharing). The images have been center cropped, resized, and organized into batches with 10000 images each for efficient I/O. 
 
 Download this dataset, unzip into a folder. This folder should also directly contain all the ```npy``` files without additional nesting. You can train by running
 
 ``` python train.py --dataset=lsun --db_path=/path/to/lsun/dataset ```
 
-For other LSUN scene classes you should first preprocess the files into batches of 10000, where each batch is a numpy array ```[batch, height, width, channel]```. 
+For other LSUN scene classes you should first preprocess the files into batches of 10000, where each batch is a numpy array ```[batch, height, width, channel]```.  Place these batches into the ```db_path``` folder.
 
 # More Options
 
