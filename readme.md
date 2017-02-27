@@ -2,7 +2,7 @@
 
 
 
-This is the implementation of the Sequential VAE. (Cite) identifies a link between power of latent code and sharpness of generated samples. We are able to generate fairly sharp samples by gradually augmenting the power of latent code.
+This is the implementation of the Sequential VAE. (Paper to appear) identifies a link between power of latent code and sharpness of generated samples. We are able to generate fairly sharp samples by gradually augmenting the power of latent code.
 
 Samples look like this
 
@@ -22,7 +22,7 @@ Download the [aligned and cropped version](https://drive.google.com/open?id=0B7E
 
 Now you can train by running
 
-``` python train.py --dataset=celebA --db_path=/path/to/celebA/dataset ```
+``` python main.py --dataset=celebA --db_path=/path/to/celebA/dataset ```
 
 You can see the visualizations in the folder ```$pwd/models/[network_name]/samples```
 
@@ -32,14 +32,16 @@ For LSUN bedroom we provide a preprocessed version available for download [here 
 
 Download this dataset, unzip into a folder. This folder should also directly contain all the ```npy``` files without additional nesting. You can train by running
 
-``` python train.py --dataset=lsun --db_path=/path/to/lsun/dataset ```
+``` python main.py --dataset=lsun --db_path=/path/to/lsun/dataset ```
 
 For other LSUN scene classes you should first preprocess the files into batches of 10000, where each batch is a numpy array ```[batch, height, width, channel]```.  Place these batches into the ```db_path``` folder.
 
 # More Options
 
 - To use a particular GPU/GPUs add option ```--gpus=[ids]``` such as ```--gpus=0,1``` to use GPU 0 and 1. The visualizations in the paper are produced after 2 days of training on a single Titan X.
-- To use other architectures other than default, use ```--netname=[name]```. For supported architectures please refer to code. The name is the unique identifier for the network, and all related training log, visualizations, and checkpoint files, etc will be stored in the directory ```$pwd/model/netname```. For example, to run visualization with tensorboard use ``` tensorboard --logdir=[that directory]```.
+- To use other architectures other than default, use ```--netname=[name]```. For supported architectures please refer to code. The name is the unique identifier for the network, and all related training log, visualizations, and checkpoint files, etc will be stored in the directory ```$pwd/model/netname```. For example, to run visualization with tensorboard use ``` tensorboard --logdir=[that directory]```
+- To also visualize the training process with a GUI window add ```--use_gui```. By default all plots will be stored to network directory, this will also plot them in a window in addition to that.
 - To change batch size, add ``` --batch_size=[size]```
 - To visualize and plot the autoencoding reconstruction of the model, add ```--plot_reconstruction```
 - To add Gaussian and salt and pepper noise to perform denoise training add ```--denoise_train```
+- To control the number of batches before we visualize and make plots, use ```--vis_frequency=[num_batch]```
