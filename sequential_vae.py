@@ -13,8 +13,8 @@ class SequentialVAE(Network):
         self.batch_size = batch_size
         self.data_dims = dataset.data_dims
 
-        self.fs = [self.data_dims[0], self.data_dims[0] / 2, self.data_dims[0] / 4, self.data_dims[0] / 8,
-                   self.data_dims[0] / 16]
+        self.fs = [self.data_dims[0], self.data_dims[0] // 2, self.data_dims[0] // 4, self.data_dims[0] // 8,
+                   self.data_dims[0] // 16]
         self.cs = [self.data_dims[-1], 48, 96, 192, 384, 512]
 
         # Share weights between generator steps. Set this to true for homogeneous Markov chain.
@@ -317,11 +317,11 @@ class SequentialVAE(Network):
             if condition is not None:
                 ladder3 = tf.concat(1, [ladder3, condition])
                 print("Add labels")
-            ladder0 = fc_bn_lrelu(ladder0, self.fs[1] * self.fs[1] * self.cs[1])
+            ladder0 = fc_bn_lrelu(ladder0, int(self.fs[1] * self.fs[1] * self.cs[1]))
             ladder0 = tf.reshape(ladder0, [-1, self.fs[1], self.fs[1], self.cs[1]])
-            ladder1 = fc_bn_lrelu(ladder1, self.fs[2] * self.fs[2] * self.cs[2])
+            ladder1 = fc_bn_lrelu(ladder1, int(self.fs[2] * self.fs[2] * self.cs[2]))
             ladder1 = tf.reshape(ladder1, [-1, self.fs[2], self.fs[2], self.cs[2]])
-            ladder2 = fc_bn_lrelu(ladder2, self.fs[3] * self.fs[3] * self.cs[3])
+            ladder2 = fc_bn_lrelu(ladder2, int(self.fs[3] * self.fs[3] * self.cs[3]))
             ladder2 = tf.reshape(ladder2, [-1, self.fs[3], self.fs[3], self.cs[3]])
             ladder3 = fc_bn_lrelu(ladder3, self.cs[5])
             ladder3 = tf.reshape(ladder3, [-1, self.cs[5]])
@@ -340,8 +340,8 @@ class SequentialVAE(Network):
                 ladder3 = self.combine_noise(ifc2, ladder3, name="ladder3")
 
             gfc1 = fc_bn_relu(ladder3, self.cs[5])
-            gconv7 = fc_bn_relu(gfc1, self.data_dims[0]/16 * self.data_dims[0]/16 * self.cs[4])
-            gconv7 = tf.reshape(gconv7, tf.pack([tf.shape(gconv7)[0], self.data_dims[0]/16, self.data_dims[0]/16, self.cs[4]]))
+            gconv7 = fc_bn_relu(gfc1, self.fs[4] * self.fs[4] * self.cs[4])
+            gconv7 = tf.reshape(gconv7, tf.pack([tf.shape(gconv7)[0], self.fs[4], self.fs[4], self.cs[4]]))
 
             if inputs is not None:
                 gconv6 = tf.nn.relu(conv2d_t_bn(gconv7, self.cs[3], [4, 4], 2) + iconv6)
