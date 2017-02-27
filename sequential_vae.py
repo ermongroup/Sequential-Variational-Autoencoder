@@ -123,7 +123,7 @@ class SequentialVAE(Network):
                     gsample, _ = self.generator(gsample, external_latent, None, reuse=True, condition=self.condition)
                 else:
                     tsample, ratio = self.generator(tsample, latent_sample, step, condition=self.condition)
-                    gsample, _ = self.generator(tsample, external_latent, step, reuse=True, condition=self.condition)
+                    gsample, _ = self.generator(gsample, external_latent, step, reuse=True, condition=self.condition)
                 tf.summary.scalar("resnet_gate_weight%d" % step, tf.reduce_mean(ratio))
             self.tsamples.append(tsample)
             self.gsamples.append(gsample)
@@ -184,16 +184,16 @@ class SequentialVAE(Network):
         feed_dict = dict()
         if self.condition is not None:
             feed_dict[self.condition] = condition
-        for i in range(self.steps):
-            feed_dict[self.latents[i]] = np.random.normal(size=(batch_size, self.latent_dim))
         if batch_input is None:
+            for i in range(self.steps):
+                feed_dict[self.latents[i]] = np.random.normal(size=(batch_size, self.latent_dim))
             output = self.sess.run(self.gsamples, feed_dict=feed_dict)
         else:
             feed_dict[self.input_placeholder] = batch_input
             output = self.sess.run(self.tsamples, feed_dict=feed_dict)
         return output
 
-    def visualize(self, iteration, batch_size=10, label_set=None):
+    def visualize(self, epoch, batch_size=10, label_set=None):
         if self.mc_fig is None:
             self.mc_fig = plt.figure()
         else:
@@ -220,7 +220,7 @@ class SequentialVAE(Network):
                 self.mc_fig.gca().set_title("train")
             else:
                 self.mc_fig.gca().set_title("test")
-            epoch = int(iteration / 500)
+
             folder_name = 'models/%s/samples' % self.name
             if not os.path.isdir(folder_name):
                 os.makedirs(folder_name)

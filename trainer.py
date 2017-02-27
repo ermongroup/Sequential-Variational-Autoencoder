@@ -58,6 +58,8 @@ class NoisyTrainer:
             if time.time() - refresh_time > 0.2:
                 plt.pause(0.001)
                 refresh_time = time.time()
+            if iteration % 500 == 0:
+                self.network.visualize(iteration // 500)
 
             images = self.dataset.next_batch(self.batch_size)
             noisy_input = self.get_noisy_input(images)
