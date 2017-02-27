@@ -15,6 +15,7 @@ class SequentialVAE(Network):
 
         self.fs = [self.data_dims[0], self.data_dims[0] // 2, self.data_dims[0] // 4, self.data_dims[0] // 8,
                    self.data_dims[0] // 16]
+        # Increasing this is generally beneficial if you have more memory
         self.cs = [self.data_dims[-1], 48, 96, 192, 384, 512]
 
         # Share weights between generator steps. Set this to true for homogeneous Markov chain.
@@ -63,9 +64,6 @@ class SequentialVAE(Network):
         self.input_placeholder = tf.placeholder(shape=[None]+self.data_dims, dtype=tf.float32, name="input_placeholder")
         self.target_placeholder = tf.placeholder(shape=[None]+self.data_dims, dtype=tf.float32, name="target_placeholder")
 
-        const1 = math.log(math.sqrt(2 * math.pi))
-        const2 = math.log(math.sqrt(2 * math.pi * math.e))
-
         self.reg_coeff = tf.placeholder_with_default(1.0, shape=[], name="regularization_coeff")
         self.latents = []
         self.tsamples = []
@@ -88,7 +86,8 @@ class SequentialVAE(Network):
             latent_sample = latent_mean + tf.mul(latent_stddev,
                                                  tf.random_normal(tf.pack([tf.shape(self.input_placeholder)[0], self.latent_dim])))
 
-            # Predict the latent state of the next step. This can be used to explicitly capture dependence between latent code
+            # Predict the latent state of the next step.
+            # This can be used to explicitly capture dependence between latent code
             if latent_mean_pred is not None:
                 pred_loss = tf.log(latent_stddev_pred) - tf.log(latent_stddev) + \
                             tf.div(tf.square(latent_stddev), 2 * tf.square(latent_stddev_pred)) + \
@@ -106,11 +105,13 @@ class SequentialVAE(Network):
             # Obtain prediction for next step
             if self.use_latent_pred:
                 if self.share:
-                    latent_mean_pred, latent_stddev_pred = self.latent_code_generator(latent_sample, step=None, reuse=True, condition=self.condition)
+                    latent_mean_pred, latent_stddev_pred = \
+                        self.latent_code_generator(latent_sample, step=None, reuse=(step != 0), condition=self.condition)
                     glatent_mean_pred, glatent_stddev_pred = \
                         self.latent_code_generator(external_latent, step=None, reuse=True, condition=self.condition)
                 else:
-                    latent_mean_pred, latent_stddev_pred = self.latent_code_generator(latent_sample, step=step, condition=self.condition)
+                    latent_mean_pred, latent_stddev_pred = \
+                        self.latent_code_generator(latent_sample, step=step, condition=self.condition)
                     glatent_mean_pred, glatent_stddev_pred = \
                         self.latent_code_generator(external_latent, step=step, reuse=True, condition=self.condition)
             # Generate samples
@@ -128,11 +129,13 @@ class SequentialVAE(Network):
             self.tsamples.append(tsample)
             self.gsamples.append(gsample)
 
+            const1 = math.log(math.sqrt(2 * math.pi))
+            const2 = math.log(math.sqrt(2 * math.pi * math.e))
             regularization_loss = tf.reduce_sum(-tf.log(latent_stddev) +
                                                 0.5 * tf.square(latent_stddev) +
                                                 0.5 * tf.square(latent_mean)) / self.batch_size - const2 + const1
-            step_loss = 16 * tf.reduce_sum(tf.square(tsample - self.target_placeholder)) / self.batch_size
-            self.loss += step_loss + regularization_loss * self.reg_coeff
+            step_loss = tf.reduce_sum(tf.square(tsample - self.target_placeholder)) / self.batch_size
+            self.loss += 16 * step_loss + regularization_loss * self.reg_coeff
             self.final_loss = step_loss
 
             tf.summary.scalar("reconstruction_loss%d" % step, step_loss)
@@ -178,48 +181,59 @@ class SequentialVAE(Network):
     def random_latent_code(self):
         pass
 
-    def generate_mc_samples(self, batch_size=None, batch_input=None, condition=None):
+    def generate_mc_samples(self, batch_input, batch_size=None, condition=None):
         if batch_size is None:
             batch_size = self.batch_size
         feed_dict = dict()
         if self.condition is not None:
             feed_dict[self.condition] = condition
-        if batch_input is None:
-            for i in range(self.steps):
-                feed_dict[self.latents[i]] = np.random.normal(size=(batch_size, self.latent_dim))
-            output = self.sess.run(self.gsamples, feed_dict=feed_dict)
-        else:
-            feed_dict[self.input_placeholder] = batch_input
-            output = self.sess.run(self.tsamples, feed_dict=feed_dict)
+
+        for i in range(self.steps):
+            feed_dict[self.latents[i]] = np.random.normal(size=(batch_size, self.latent_dim))
+        # This is needed because for some versions batch_norm requires input from shared weight networks
+        feed_dict[self.input_placeholder] = batch_input
+        output = self.sess.run(self.gsamples, feed_dict=feed_dict)
         return output
 
-    def visualize(self, epoch, batch_size=10, label_set=None):
-        if self.mc_fig is None:
-            self.mc_fig = plt.figure()
-        else:
-            self.mc_fig.clf()
+    def conditioned_mc_samples(self, batch_input, condition=None):
+        feed_dict = dict()
+        if self.condition is not None:
+            feed_dict[self.condition] = condition
+        feed_dict[self.input_placeholder] = batch_input
+        output = self.sess.run(self.tsamples, feed_dict=feed_dict)
+        return output
+
+    def visualize(self, epoch, batch_size=10, label_set=None, use_gui=True):
+        if use_gui is True:
+            if self.mc_fig is None:
+                self.mc_fig = plt.figure()
+            else:
+                self.mc_fig.clf()
 
         for i in range(2):
             if i == 0:
-                z = self.generate_mc_samples(batch_size)
+                bx = self.dataset.next_batch(batch_size)
+                z = self.generate_mc_samples(bx, batch_size)
             else:
                 bx = self.dataset.next_batch(batch_size)
-                z = self.generate_mc_samples(batch_size, bx)
+                z = self.conditioned_mc_samples(bx)
                 z[0] = bx
             v = np.zeros([z[0].shape[0] * self.data_dims[0], len(z) * self.data_dims[1], self.data_dims[2]])
             for b in range(0, z[0].shape[0]):
                 for t in range(0, len(z)):
                     v[b*self.data_dims[0]:(b+1)*self.data_dims[0], t*self.data_dims[1]:(t+1)*self.data_dims[1]] = self.dataset.display(z[t][b])
-            if self.data_dims[-1] == 1:
-                self.mc_fig.add_subplot(1, 1+len(label_set), i+1).imshow(v[:, :, 0], cmap='gray')
-            else:
-                self.mc_fig.add_subplot(1, 1+len(label_set), i+1).imshow(v)
-            self.mc_fig.gca().xaxis.set_visible(False)
-            self.mc_fig.gca().yaxis.set_visible(False)
-            if i == 1:
-                self.mc_fig.gca().set_title("train")
-            else:
-                self.mc_fig.gca().set_title("test")
+
+            if use_gui is True:
+                if self.data_dims[-1] == 1:
+                    self.mc_fig.add_subplot(1, 1+len(label_set), i+1).imshow(v[:, :, 0], cmap='gray')
+                else:
+                    self.mc_fig.add_subplot(1, 1+len(label_set), i+1).imshow(v)
+                self.mc_fig.gca().xaxis.set_visible(False)
+                self.mc_fig.gca().yaxis.set_visible(False)
+                if i == 1:
+                    self.mc_fig.gca().set_title("train")
+                else:
+                    self.mc_fig.gca().set_title("test")
 
             folder_name = 'models/%s/samples' % self.name
             if not os.path.isdir(folder_name):
@@ -234,7 +248,9 @@ class SequentialVAE(Network):
             else:
                 misc.imsave(os.path.join(folder_name, 'train_epoch%d.png' % epoch), v)
                 misc.imsave(os.path.join(folder_name, 'train_current.png'), v)
-        plt.pause(0.01)
+        if use_gui is True:
+            plt.draw()
+            plt.pause(0.01)
 
     def latent_code_generator(self, latent, condition=None, step=None, reuse=False):
         if step is None:

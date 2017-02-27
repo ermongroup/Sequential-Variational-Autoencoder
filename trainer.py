@@ -1,8 +1,6 @@
-import argparse
-import time, os
-
+import time
 from dataset import *
-from sequential_vae import SequentialVAE
+
 
 class NoisyTrainer:
     def __init__(self, network, dataset, args):
@@ -51,13 +49,9 @@ class NoisyTrainer:
         return np.clip(noisy_input, a_min=self.dataset.range[0], a_max=self.dataset.range[1])
 
     def train(self):
-        refresh_time = time.time()  # This is only a trick to prevent gui freeze for matplotlib
-
         for iteration in range(10000000):
             iter_time = time.time()
-            if time.time() - refresh_time > 0.2:
-                plt.pause(0.001)
-                refresh_time = time.time()
+
             if iteration % 500 == 0:
                 self.network.visualize(iteration // 500)
 
@@ -81,66 +75,44 @@ class NoisyTrainer:
             noisy_test_image = self.get_noisy_input(test_image)
             reconstruction = self.network.test(noisy_test_image)
             error += np.sum(np.square(reconstruction - test_image)) / np.prod(self.data_dims[:2]) / self.batch_size
-            if test_iter == 0 and args.plot_reconstruction:
+            if test_iter == 0 and self.args.plot_reconstruction:
                 # Plot the original image, noisy image, and reconstructed image
                 self.plot_reconstruction(test_image, noisy_test_image, reconstruction)
         return error / num_batch
 
-    def plot_reconstruction(self, test_image, noisy_image, reconstruction, num_plot=3):
+    def plot_reconstruction(self, epoch, test_image, noisy_image, reconstruction, num_plot=3):
+        if test_image.shape[-1] == 1:   # Black background for mnist, white for color images
+            canvas = np.zeros((num_plot*self.data_dims[0], 3*self.data_dims[1] + 20, self.data_dims[2]))
+        else:
+            canvas = np.ones((num_plot*self.data_dims[0], 3*self.data_dims[1] + 20, self.data_dims[2]))
         for img_index in range(num_plot):
-            if self.data_dims[-1] == 1:
-                self.fig.add_subplot(num_plot, 3, img_index*3+1).imshow(
-                    self.dataset.display(test_image[img_index, :, :, 0]), cmap=plt.get_cmap('Greys'))
-                self.fig.add_subplot(num_plot, 3, img_index*3+2).imshow(
-                    self.dataset.display(noisy_image[img_index, :, :, 0]), cmap=plt.get_cmap('Greys'))
-                self.fig.add_subplot(num_plot, 3, img_index*3+3).imshow(
-                    self.dataset.display(reconstruction[img_index, :, :, 0]), cmap=plt.get_cmap('Greys'))
+            canvas[img_index*self.data_dims[0]:(img_index+1)*self.data_dims[0], 0:self.data_dims[1]] = \
+                self.dataset.display(test_image[img_index, :, :])
+            canvas[img_index*self.data_dims[0]:(img_index+1)*self.data_dims[0], self.data_dims[1]+10:self.data_dims[1]*2+10] = \
+                self.dataset.display(noisy_image[img_index, :, :])
+            canvas[img_index*self.data_dims[0]:(img_index+1)*self.data_dims[0], self.data_dims[1]*2+20:] = \
+                self.dataset.display(reconstruction[img_index, :, :])
+
+        img_folder = "models/" + self.network.name + "/reconstruction"
+        if not os.path.isdir(img_folder):
+            os.makedirs(img_folder)
+
+        if canvas.shape[-1] == 1:
+            misc.imsave(os.path.join(img_folder, 'current.png'), canvas[:, :, 0])
+            misc.imsave(os.path.join(img_folder, 'epoch%d.png' % epoch), canvas[:, :, 0])
+        else:
+            misc.imsave(os.path.join(img_folder, 'current.png'), canvas)
+            misc.imsave(os.path.join(img_folder, 'epoch%d.png' % epoch), canvas)
+
+        if self.args.use_gui:
+            if self.fig is None:
+                self.fig, self.ax = plt.subplots()
+                self.fig.suptitle("Reconstruction of " + str(self.network.name))
+            self.ax.cla()
+            if canvas.shape[-1] == 1:
+                self.ax.imshow(canvas[:, :, 0], cmap=plt.get_cmap('Greys'))
             else:
-                self.fig.add_subplot(num_plot, 3, img_index*3+1).imshow(
-                    self.dataset.display(test_image[img_index]))
-                self.fig.add_subplot(num_plot, 3, img_index*3+2).imshow(
-                    self.dataset.display(noisy_image[img_index]))
-                self.fig.add_subplot(num_plot, 3, img_index*3+3).imshow(
-                    self.dataset.display(reconstruction[img_index]))
-        plt.draw()
-        plt.pause(1)
-
-# --dataset=svhn --denoise_train --plot_reconstruction --gpus=1 --db_path=dataset/svhn
-# --dataset=celebA --denoise_train --plot_reconstruction --gpus=2 --db_path=/ssd_data/CelebA
-# --dataset=mnist --gpus=0
-# --dataset=lsun --denoise_train --plot_reconstruction --gpus=0 --db_path=/data/data/lsun/bedroom
-
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--gpus', type=str, default='')
-    parser.add_argument('--dataset', type=str, default='celebA')
-    parser.add_argument('--netname', type=str, default='')
-    parser.add_argument('--batch_size', type=int, default=100)
-    parser.add_argument('--db_path', type=str, default='')
-    parser.add_argument('--denoise_train', dest='denoise_train', action='store_true',
-                        help='Use denoise training by adding Gaussian/salt and pepper noise')
-    parser.add_argument('--plot_reconstruction', dest='plot_reconstruction', action='store_true',
-                        help='Plot reconstruction')
-    args = parser.parse_args()
-
-    if args.gpus is not '':
-        os.environ['CUDA_VISIBLE_DEVICES'] = args.gpus
-
-    plt.ion()
-    plt.show()
-
-    if args.dataset == 'mnist':
-        dataset = MnistDataset()
-    elif args.dataset == 'lsun':
-        dataset = LSUNDataset(db_path=args.db_path)
-    elif args.dataset == 'celebA':
-        dataset = CelebADataset(db_path=args.db_path)
-    elif args.dataset == 'svhn':
-        dataset = SVHNDataset(db_path=args.db_path)
-    else:
-        print("Unknown dataset")
-        exit(-1)
-    model = SequentialVAE(dataset, name=args.netname, batch_size=args.batch_size)
-    trainer = NoisyTrainer(model, dataset, args)
-    trainer.train()
+                self.ax.imshow(canvas)
+            plt.draw()
+            plt.pause(1)
 
