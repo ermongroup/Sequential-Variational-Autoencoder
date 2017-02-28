@@ -153,7 +153,7 @@ class SequentialVAE(Network):
         self.print_network()
         self.read_only = False
 
-        self.mc_fig = None
+        self.mc_fig, self.mc_ax = None, None
 
     def train(self, batch_input, batch_target, condition=None):
         self.iteration += 1
@@ -204,11 +204,8 @@ class SequentialVAE(Network):
         return output
 
     def visualize(self, epoch, batch_size=10, condition=None, use_gui=True):
-        if use_gui is True:
-            if self.mc_fig is None:
-                self.mc_fig = plt.figure()
-            else:
-                self.mc_fig.clf()
+        if use_gui is True and self.mc_fig is None:
+            self.mc_fig, self.mc_ax = plt.subplots(1, 2)
 
         for i in range(2):
             if i == 0:
@@ -217,23 +214,24 @@ class SequentialVAE(Network):
             else:
                 bx = self.dataset.next_batch(batch_size)
                 z = self.conditioned_mc_samples(bx, condition=condition)
-                z[0] = bx
+                z = [bx] + z
             v = np.zeros([z[0].shape[0] * self.data_dims[0], len(z) * self.data_dims[1], self.data_dims[2]])
             for b in range(0, z[0].shape[0]):
                 for t in range(0, len(z)):
                     v[b*self.data_dims[0]:(b+1)*self.data_dims[0], t*self.data_dims[1]:(t+1)*self.data_dims[1]] = self.dataset.display(z[t][b])
 
             if use_gui is True:
+                self.mc_ax[i].cla()
                 if self.data_dims[-1] == 1:
-                    self.mc_fig.add_subplot(1, 2, i+1).imshow(v[:, :, 0], cmap='gray')
+                    self.mc_ax[i].imshow(v[:, :, 0], cmap='gray')
                 else:
-                    self.mc_fig.add_subplot(1, 2, i+1).imshow(v)
-                self.mc_fig.gca().xaxis.set_visible(False)
-                self.mc_fig.gca().yaxis.set_visible(False)
+                    self.mc_ax[i].imshow(v)
+                self.mc_ax[i].xaxis.set_visible(False)
+                self.mc_ax[i].yaxis.set_visible(False)
                 if i == 0:
-                    self.mc_fig.gca().set_title("test")
+                    self.mc_ax[i].set_title("test")
                 else:
-                    self.mc_fig.gca().set_title("train")
+                    self.mc_ax[i].set_title("train")
 
             folder_name = 'models/%s/samples' % self.name
             if not os.path.isdir(folder_name):
