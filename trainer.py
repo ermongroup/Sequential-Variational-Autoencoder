@@ -12,13 +12,8 @@ class NoisyTrainer:
         self.train_with_mask = False
         self.train_discrete = False
 
-        if args.plot_reconstruction:
-            plt.ion()
-            self.fig = plt.figure()
-            plt.show()
-            self.fig.suptitle("Reconstruction of " + str(self.network.name))
-            self.network = network
-
+        self.fig = None
+        self.network = network
         self.test_reconstruction_error = True
 
     def get_noisy_input(self, original):
@@ -52,8 +47,10 @@ class NoisyTrainer:
         for iteration in range(10000000):
             iter_time = time.time()
 
-            if iteration % 500 == 0:
-                self.network.visualize(iteration // 500)
+            if iteration % self.args.vis_frequency == 0:
+                test_error = self.test(iteration // self.args.vis_frequency, 5)
+                print("Reconstruction error @%d per pixel: " % iteration, test_error)
+                self.network.visualize(iteration // self.args.vis_frequency)
 
             images = self.dataset.next_batch(self.batch_size)
             noisy_input = self.get_noisy_input(images)
@@ -63,12 +60,10 @@ class NoisyTrainer:
                 print("Iteration %d: Reconstruction loss %f, time per iter %fs" %
                       (iteration, train_loss, time.time() - iter_time))
 
-            if iteration % 500 == 0:
-                test_error = self.test(5)
-                print("Reconstruction error @%d per pixel: " % iteration, test_error)
+
 
     """ Returns reconstruction error per pixel """
-    def test(self, num_batch=3):
+    def test(self, epoch, num_batch=3):
         error = 0.0
         for test_iter in range(num_batch):
             test_image = self.dataset.next_test_batch(self.batch_size)
@@ -77,7 +72,7 @@ class NoisyTrainer:
             error += np.sum(np.square(reconstruction - test_image)) / np.prod(self.data_dims[:2]) / self.batch_size
             if test_iter == 0 and self.args.plot_reconstruction:
                 # Plot the original image, noisy image, and reconstructed image
-                self.plot_reconstruction(test_image, noisy_test_image, reconstruction)
+                self.plot_reconstruction(epoch, test_image, noisy_test_image, reconstruction)
         return error / num_batch
 
     def plot_reconstruction(self, epoch, test_image, noisy_image, reconstruction, num_plot=3):
