@@ -1,10 +1,8 @@
 # Implementation of Sequential VAE
 
-
-
 This is the implementation of the Sequential VAE. (Paper to appear) identifies a link between power of latent code and sharpness of generated samples. We are able to generate fairly sharp samples by gradually augmenting the power of latent code.
 
-Samples look like this
+The model is a (non-homogeneous) Markov chain. For each step, we take the results from previous step, learn a new latent code, and train the model to perform reconstruction conditioned on both. We extensively use shortcut/resnet connections so that result from previous step can be well preserved. Samples look like this
 
 ![seq_vae_celeba](plots/seq_vae_celebA.png)
 
@@ -45,3 +43,9 @@ For other LSUN scene classes you should first preprocess the files into batches 
 - To visualize and plot the autoencoding reconstruction of the model, add ```--plot_reconstruction```
 - To add Gaussian and salt and pepper noise to perform denoise training add ```--denoise_train```
 - To control the number of batches before we visualize and make plots, use ```--vis_frequency=[num_batch]```
+
+# Related Work
+
+The baseline architecture used is the [Variational Ladder Autoencoder](https://github.com/ShengjiaZhao/Variational-Ladder-Autoencoder)
+
+This model can be viewed as a generalization of [Infusion training](https://openreview.net/pdf?id=BJAFbaolg).  The difference is that for each time step we explicitly learn a latent code rather than using random pixels from ground truth as latent code. 
