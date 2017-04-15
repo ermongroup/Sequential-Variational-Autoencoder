@@ -1,6 +1,6 @@
 # Implementation of Sequential VAE
 
-This is the implementation of the Sequential VAE. (Paper to appear) identifies a link between power of latent code and sharpness of generated samples. We are able to generate fairly sharp samples by gradually augmenting the power of latent code.
+This is the implementation of the [Sequential VAE](https://arxiv.org/abs/1702.08658) in [Towards a Deeper Understanding of Variational Autoencoding Models](https://arxiv.org/abs/1702.08658). The paper identifies a link between power of latent code and sharpness of generated samples. We are able to generate fairly sharp samples by gradually augmenting the power of latent code.
 
 The model is a (non-homogeneous) Markov chain. For each step, we take the results from previous step, learn a new latent code, and train the model to perform reconstruction conditioned on both. We extensively use shortcut/resnet connections so that result from previous step can be well preserved. Samples look like this
 
