@@ -51,8 +51,15 @@ class SequentialVAE(Network):
             self.steps = 8
             self.generator = self.generator_ladder
             self.inference = self.inference_ladder
+        elif self.name == "sequential_vae_lsun_single":
+            self.ladder_dims = [160, 240, 240, 240]
+            self.latent_dim = np.sum(self.ladder_dims)
+            self.steps = 1
+            self.generator = self.generator_ladder
+            self.inference = self.inference_ladder
         elif self.name == "sequential_vae_lsun_final":
             self.ladder_dims = [20, 30, 30, 30]
+            self.cs = [self.data_dims[-1], 32, 64, 128, 384, 512]
             self.latent_dim = np.sum(self.ladder_dims)
             self.steps = 8
             self.intermediate_reconstruction = False
@@ -152,8 +159,8 @@ class SequentialVAE(Network):
 
             tf.summary.scalar("reconstruction_loss%d" % step, step_loss)
             tf.summary.scalar("regularization_loss%d" % step, regularization_loss)
-
-            tsample = tf.stop_gradient(tsample)
+            if self.intermediate_reconstruction:
+                tsample = tf.stop_gradient(tsample)
         tf.summary.scalar("loss", self.loss)
 
         self.merged_summary = tf.summary.merge_all()
