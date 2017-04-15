@@ -28,6 +28,8 @@ class SequentialVAE(Network):
         # To activate, replace this with a placeholder.
         # Supply the value for that placeholder during both training and sampling
         self.condition = None
+        # Use intermediate reconstruction
+        self.intermediate_reconstruction = True
 
         # Configuration for different netnames. Add your own if needed
         if self.name == "sequential_vae_celebA":
@@ -36,7 +38,7 @@ class SequentialVAE(Network):
             self.steps = 8
             self.generator = self.generator_ladder
             self.inference = self.inference_ladder
-        elif self.name == "sequential_vae_celebA_ladder_pred":
+        elif self.name == "sequential_vae_celebA_pred":
             self.ladder_dims = [10, 10, 10, 10]
             self.latent_dim = np.sum(self.ladder_dims)
             self.steps = 8
@@ -49,7 +51,14 @@ class SequentialVAE(Network):
             self.steps = 8
             self.generator = self.generator_ladder
             self.inference = self.inference_ladder
-        elif self.name == "sequential_vae_lsun_ladder_pred":
+        elif self.name == "sequential_vae_lsun_final":
+            self.ladder_dims = [20, 30, 30, 30]
+            self.latent_dim = np.sum(self.ladder_dims)
+            self.steps = 8
+            self.intermediate_reconstruction = False
+            self.generator = self.generator_ladder
+            self.inference = self.inference_ladder
+        elif self.name == "sequential_vae_lsun_pred":
             self.cs = [self.data_dims[-1], 64, 128, 256, 512, 1024]
             self.ladder_dims = [20, 20, 20, 20]
             self.latent_dim = np.sum(self.ladder_dims)
@@ -135,7 +144,10 @@ class SequentialVAE(Network):
                                                 0.5 * tf.square(latent_stddev) +
                                                 0.5 * tf.square(latent_mean)) / self.batch_size - const2 + const1
             step_loss = tf.reduce_sum(tf.square(tsample - self.target_placeholder)) / self.batch_size
-            self.loss += 16 * step_loss + regularization_loss * self.reg_coeff
+            if self.intermediate_reconstruction or step == self.steps - 1:
+                self.loss += 16 * step_loss + regularization_loss * self.reg_coeff
+            else:
+                self.loss += regularization_loss * self.reg_coeff
             self.final_loss = step_loss
 
             tf.summary.scalar("reconstruction_loss%d" % step, step_loss)
