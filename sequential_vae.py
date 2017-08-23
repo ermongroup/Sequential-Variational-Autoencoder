@@ -95,12 +95,12 @@ class SequentialVAE(Network):
             latent_placeholder = tf.placeholder(shape=[None, self.latent_dim], dtype=tf.float32, name="latent_ph%d" % step)
             self.latents.append(latent_placeholder)
             if step == 0:
-                gsample = tf.random_uniform(shape=tf.pack([tf.shape(self.input_placeholder)[0]] + self.data_dims))
+                gsample = tf.random_uniform(shape=tf.stack([tf.shape(self.input_placeholder)[0]] + self.data_dims))
                 self.gsamples.append(gsample)
 
             latent_mean, latent_stddev = self.inference(self.input_placeholder, step)
-            latent_sample = latent_mean + tf.mul(latent_stddev,
-                                                 tf.random_normal(tf.pack([tf.shape(self.input_placeholder)[0], self.latent_dim])))
+            latent_sample = latent_mean + tf.multiply(latent_stddev,
+                                                 tf.random_normal(tf.stack([tf.shape(self.input_placeholder)[0], self.latent_dim])))
 
             # Predict the latent state of the next step.
             # This can be used to explicitly capture dependence between latent code
@@ -114,7 +114,7 @@ class SequentialVAE(Network):
 
             # If we make a prediction then transform input white Gaussian to the Gaussian we predicted
             if glatent_mean_pred is not None:
-                external_latent = glatent_mean_pred + tf.mul(glatent_stddev_pred, latent_placeholder)
+                external_latent = glatent_mean_pred + tf.multiply(glatent_stddev_pred, latent_placeholder)
             else:
                 external_latent = latent_placeholder
 
@@ -278,7 +278,7 @@ class SequentialVAE(Network):
             if reuse:
                 scope.reuse_variables()
             if condition is not None:
-                latent = tf.concat(1, [latent, condition])
+                latent = tf.concat([latent, condition], 1)
             fc1 = fc_bn_lrelu(latent, 1024)
             fc2 = fc_bn_lrelu(fc1, 1024)
             fc3 = fc_bn_lrelu(fc2, 1024)
@@ -317,20 +317,20 @@ class SequentialVAE(Network):
             ladder3_mean = tf.contrib.layers.fully_connected(ifc1, self.ladder_dims[3], activation_fn=tf.identity)
             ladder3_stddev = tf.contrib.layers.fully_connected(ifc1, self.ladder_dims[3], activation_fn=tf.sigmoid)
 
-            latent_mean = tf.concat(1, [ladder0_mean, ladder1_mean, ladder2_mean, ladder3_mean])
-            latent_stddev = tf.concat(1, [ladder0_stddev, ladder1_stddev, ladder2_stddev, ladder3_stddev])
+            latent_mean = tf.concat([ladder0_mean, ladder1_mean, ladder2_mean, ladder3_mean], 1)
+            latent_stddev = tf.concat([ladder0_stddev, ladder1_stddev, ladder2_stddev, ladder3_stddev],1)
             return latent_mean, latent_stddev
 
     def combine_noise(self, latent, ladder, name="default"):
         method = 'concat'
         if method is 'concat':
-            return tf.concat(len(latent.get_shape())-1, [latent, ladder])
+            return tf.concat([latent, ladder], len(latent.get_shape())-1)
         elif method is 'add':
             return latent + ladder
         elif method is 'gated_add':
             gate = tf.get_variable("gate", shape=ladder.get_shape()[1:], initializer=tf.constant_initializer(0.1))
             tf.histogram_summary(name + "_noise_gate", gate)
-            return latent + tf.mul(gate, ladder)
+            return latent + tf.multiply(gate, ladder)
 
     def generator_ladder(self, inputs, latent, step=None, reuse=False, condition=None):
         if step is None:
@@ -341,14 +341,14 @@ class SequentialVAE(Network):
             if reuse:
                 gs.reuse_variables()
 
-            ladder0, ladder1, ladder2, ladder3 = tf.split_v(latent, self.ladder_dims, 1)
+            ladder0, ladder1, ladder2, ladder3 = tf.split(latent, self.ladder_dims, 1)
             # Manually set the size of splitted tensors because in some versions of tensowflow this is not automatic
             ladder0 = tf.reshape(ladder0, [-1, self.ladder_dims[0]])
             ladder1 = tf.reshape(ladder1, [-1, self.ladder_dims[1]])
             ladder2 = tf.reshape(ladder2, [-1, self.ladder_dims[2]])
             ladder3 = tf.reshape(ladder3, [-1, self.ladder_dims[3]])
             if condition is not None:
-                ladder3 = tf.concat(1, [ladder3, condition])
+                ladder3 = tf.concat([ladder3, condition], 1)
                 print("Add labels")
             ladder0 = fc_bn_lrelu(ladder0, int(self.fs[1] * self.fs[1] * self.cs[1]))
             ladder0 = tf.reshape(ladder0, [-1, self.fs[1], self.fs[1], self.cs[1]])
@@ -374,7 +374,7 @@ class SequentialVAE(Network):
 
             gfc1 = fc_bn_relu(ladder3, self.cs[5])
             gconv7 = fc_bn_relu(gfc1, self.fs[4] * self.fs[4] * self.cs[4])
-            gconv7 = tf.reshape(gconv7, tf.pack([tf.shape(gconv7)[0], self.fs[4], self.fs[4], self.cs[4]]))
+            gconv7 = tf.reshape(gconv7, tf.stack([tf.shape(gconv7)[0], self.fs[4], self.fs[4], self.cs[4]]))
 
             if inputs is not None:
                 gconv6 = tf.nn.relu(conv2d_t_bn(gconv7, self.cs[3], [4, 4], 2) + iconv6)
@@ -402,7 +402,7 @@ class SequentialVAE(Network):
             if inputs is not None:
                 ratio = conv2d_t(gconv1, 1, [4, 4], 2, activation_fn=tf.sigmoid)
                 ratio = tf.tile(ratio, (1, 1, 1, self.data_dims[-1]))
-                output = tf.mul(ratio, output) + tf.mul(1 - ratio, inputs)
+                output = tf.multiply(ratio, output) + tf.multiply(1 - ratio, inputs)
                 return output, ratio
             else:
                 return output
